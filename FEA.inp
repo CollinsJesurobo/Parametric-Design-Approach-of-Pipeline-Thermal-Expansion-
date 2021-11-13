@@ -1,0 +1,136 @@
+**PIPELINE THERMAL EXPANSION ANALYSIS
+**COLLINS JESUROBO
+**--------------------------------------------------------------------------------------------------------------------
+*HEADING                                                                                                                                                                     
+THERMAL EXPANSION ANALYSIS
+FLAT SEABED      
+SI UNITS ARE USED IN ALL
+*-----------------------------------------------------------------------PARAMETER
+OD=0.405                                                                     
+R=OD/2                                                                                                                               
+wt=<wt> 
+WD=1200
+g = 9.81
+Rho_steel=7850 
+Rho_sea = 1025 
+Rho_cont = 340
+Rho_coat=0
+wt_coat=0
+WD_1=-WD+R                                                               
+L_pipe=4000              
+
+
+**---------------------------------------------------------------------CALCULATIONS
+ID = OD-2*wt 
+A_steel = 3.142*(OD-wt)*wt 
+A_coat=3.142*(OD+wt_coat)*wt_coat
+A_fluid = (3.142/4)*ID**2
+Wair = ((Rho_steel* A_steel )+(Rho_coat*A_coat))*g
+Buoy = Rho_sea * ((3.142/4)*(OD+2*wt_coat)**2) *g
+Wsub_E = Wair - Buoy
+Wsub_hydro = Wsub_E + (Rho_sea *A_fluid *g)
+Wsub_cont =     Wsub_E + (Rho_cont *A_fluid *g)  
+P_ext =  Rho_sea*g*WD
+Pdes = 36
+P_hydro=1.25*Pdes
+P_int=Pdes+(Rho_cont*g*WD/10**6)
+                                                                                  
+**---------------------------------------------------------------------------------------------------------------------SEABED DEFINITION
+*NODE, NSET=SEABEDREFPT
+1000000,0,-<WD>,0                                                                                                                                                                                                                   
+*SURFACE, TYPE=CYLINDER,NAME=SEABED-SURF             
+0,0,0,1,0,0                                                                                                                                                                                                                
+0,0,-1                                                                                                                                                                                                                                                               
+START, -20,-<WD>,0                                                                                                                                                
+LINE, 4030,-<WD>,0                                                                               
+*RIGID BODY, REF NODE=SEABEDREFPT, ANALYTICAL SURFACE=SEABED-SURF    
+**---------------------------------------------------------------------------------------------------------------------PIPELINE DEFINITION
+*NODE,NSET=PIPELINE
+1,0,<WD_1>,0                          
+1000,<L_pipe>,<WD_1>,0                
+*NSET,NSET=FIRST_NODE
+1                                                   
+*NSET,NSET=MID_NODE
+500
+*NSET,NSET=LAST_NODE
+1000
+*NGEN,NSET=PIPELINE
+1,1000,1                                        
+*ELEMENT, TYPE=PIPE31H
+1,1,2                                            
+*ELGEN,ELSET=PIPELINE
+1,999,1
+*SURFACE,NAME=PIPELINE-SURF
+PIPELINE                                   
+*CONTACT PAIR, INTERACTION=PIPELINE-SEABED
+PIPELINE-SURF,SEABED-SURF          
+**------------------------------------------------------------------------------------------------------------ PIPELINE PROPERTIES
+*BEAM SECTION, ELSET=PIPELINE, MATERIAL=STEEL,TEMPERATURE=GRADIENTS, SECTION=THICK PIPE  
+<R>,<wt>                                           
+0,0,-1                                                        
+*MATERIAL,NAME=STEEL
+*DENSITY
+<Rho_steel>
+*ELASTIC
+207000E6,0.3
+*EXPANSION
+1.17E-5
+*SURFACE INTERACTION,NAME=PIPELINE-SEABED
+1
+*SURFACE BEHAVIOR,PRESSURE-OVERCLOSURE=TABULAR
+0,0                                                                                                                                                                                              
+2000,0.01
+3000,0.2
+*FRICTION,ELASTIC SLIP=0.005
+0
+**-----------------------------------------------------------------------------------------------------------INITIAL CONDITIONS
+*INITIAL CONDITION,TYPE=TEMPERATURE
+PIPELINE,4,4,4,4                                
+*BOUNDARY
+SEABEDREFPT,ENCASTRE                                                            
+PIPELINE,4,4                                      
+**------------------------------------------------------------------------------------------------------------ANALYSIS STEPS                                                                                                                               
+**-------------------------------------------------------------------------------------------------------------APPLY EMPTY WEIGHT+EXTERNAL PRESSURE
+*STEP,NAME=EMPTY ,NLGEOM=YES
+*STATIC,STABILIZE                                            
+0.01, 1.0, 1E-10, 1.0                                                       
+*DLOAD
+PIPELINE,PY,-<Wsub_E>
+PIPELINE,PE,<P_ext>,<OD>,CLOSE                        
+*OUTPUT,FIELD
+*node output
+U,CF, Coord, NT
+*element output,directions=YES
+ESF1,S,SF
+*contact output
+CDISP, CSTRESS
+*END STEP
+**-------------------------------------------------------------------------------------------------------------CHANGE FRICTION
+*STEP,NAME=CHANGE_FRICTION,NLGEOM=YES
+*STATIC
+0.01, 1.0, 1E-10, 1.0
+*CHANGE FRICTION,INTERACTION=PIPELINE-SEABED
+*FRICTION,ELASTIC SLIP=0.005
+0.25
+*END STEP
+**--------------------------------------------------------------------------------------------------------------HYDROTEST CONDITION
+*STEP, NAME=HYDROTEST, NLGEOM=YES
+*STATIC,STABILIZE                                     
+0.01, 1.0, 1E-10, 1.0                                                   
+*DLOAD
+PIPELINE,PY,-<Wsub_hydro>
+PIPELINE,PI,<P_hydro>,<ID>,CLOSE
+*END STEP                   
+**--------------------------------------------------------------------------------------------------------------APPLY OPERATING CONDITION
+*STEP,NAME=OPERATING,NLGEOM=YES
+*STATIC
+0.01, 1.0, 1E-10, 1.0          
+*DLOAD
+PIPELINE,PY,-<Wsub_hydro>
+PIPELINE,PI,<P_int>,<ID>,CLOSE
+*CHANGE FRICTION,INTERACTION=PIPELINE-SEABED
+*FRICTION,ELASTIC SLIP=0.005
+0.21
+*TEMPERATURE
+PIPELINE,74,74,74,74
+*END STEP
